@@ -8,3 +8,5 @@ click>=8.1.0
 schedule>=1.2.0
 cloudscraper>=1.2.71
 playwright>=1.40.0
+flask>=3.0.0
+reportlab>=4.0.0

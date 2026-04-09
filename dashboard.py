@@ -33,6 +33,16 @@ def get_dashboard_data():
     cheapest = min(records, key=lambda r: r["monthly_price"])
     priciest = max(records, key=lambda r: r["monthly_price"])
 
+    # Build city -> address lookup from config
+    city_addresses = {}
+    for loc in LOCATIONS:
+        key = f"{loc.city}, {loc.state}"
+        city_addresses[key] = {
+            "address": loc.address,
+            "zip_code": loc.zip_code,
+            "full": f"{loc.address}, {loc.city}, {loc.state} {loc.zip_code}",
+        }
+
     # Group by city
     by_city = defaultdict(list)
     for r in records:
@@ -103,6 +113,7 @@ def get_dashboard_data():
         "chart_cities": [c.split(",")[0] for c in chart_cities],
         "chart_series": chart_series,
         "type_order": type_order,
+        "city_addresses": city_addresses,
         "check_dates": get_all_check_dates(),
     }
 

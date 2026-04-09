@@ -138,17 +138,17 @@ class StarlinkProvider(BaseProvider):
             Plan(
                 provider="Starlink",
                 provider_type="starlink",
-                plan_name="Starlink Standard",
+                plan_name="Starlink Mini",
                 speed_down=100,
                 speed_up=10,
-                monthly_price=120.00,
+                monthly_price=35.00,
             ),
             Plan(
                 provider="Starlink",
                 provider_type="starlink",
-                plan_name="Starlink Priority",
-                speed_down=220,
-                speed_up=25,
-                monthly_price=200.00,
+                plan_name="Starlink Standard",
+                speed_down=150,
+                speed_up=15,
+                monthly_price=45.00,
             ),
         ]

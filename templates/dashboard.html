@@ -190,7 +190,13 @@
                 <tbody>
                 {% for city_name, types in data.comparison.items() %}
                     <tr>
-                        <td class="fw-bold">{{ city_name }}</td>
+                        <td class="fw-bold">{{ city_name }}
+                            {% if city_name in data.city_addresses %}
+                            <br><small class="text-muted" style="cursor:pointer" onclick="var a=this.querySelector('.addr'),l=this.querySelector('.lbl');if(a.style.display==='none'){a.style.display='inline';l.textContent='Hide address'}else{a.style.display='none';l.textContent='Show address'}">
+                                &#128205; <span class="lbl">Show address</span><span class="addr" style="display:none"> — {{ data.city_addresses[city_name].full }}</span>
+                            </small>
+                            {% endif %}
+                        </td>
                         {% for ptype in data.type_order %}
                         <td class="comparison-cell">
                             {% set matches = [] %}
@@ -247,10 +253,13 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label fw-bold">Max Price</label>
                 <input type="range" class="form-range mt-2" id="filter-price" min="0" max="250" value="250" oninput="filterTable(); document.getElementById('price-val').textContent='$'+this.value">
                 <small id="price-val" class="text-muted">$250</small>
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+                <button class="btn btn-outline-secondary btn-sm" onclick="toggleAddresses()" id="btn-addr">Show Addresses</button>
             </div>
         </div>
     </div>
@@ -271,8 +280,12 @@
                 </thead>
                 <tbody>
                 {% for r in data.records %}
-                <tr data-type="{{ r.provider_type_label }}" data-city="{{ r.city }}" data-provider="{{ r.provider }}" data-price="{{ r.monthly_price }}">
-                    <td>{{ r.city }}, {{ r.state }}</td>
+                {% set city_key = r.city ~ ", " ~ r.state %}
+                <tr data-type="{{ r.provider_type_label }}" data-city="{{ r.city }}" data-provider="{{ r.provider }}" data-price="{{ r.monthly_price }}"
+                    title="{% if city_key in data.city_addresses %}{{ data.city_addresses[city_key].full }}{% endif %}">
+                    <td>{{ r.city }}, {{ r.state }}
+                        <span class="address-col" style="display:none"><br><small class="text-muted">{% if city_key in data.city_addresses %}{{ data.city_addresses[city_key].full }}{% endif %}</small></span>
+                    </td>
                     <td><span class="type-badge type-{{ r.provider_type }}">{{ r.provider_type_label }}</span></td>
                     <td>{{ r.provider }}</td>
                     <td>{{ r.plan_name }}</td>
@@ -296,8 +309,10 @@
                 {% for city_name in data.by_city.keys()|sort %}
                 <a href="#" class="list-group-item list-group-item-action city-tab {% if loop.first %}active{% endif %}"
                    onclick="showCity('{{ city_name }}', this)" data-city="{{ city_name }}">
-                    {{ city_name }}
-                    <span class="badge bg-primary float-end">{{ data.by_city[city_name]|length }}</span>
+                    <div>{{ city_name }} <span class="badge bg-primary float-end">{{ data.by_city[city_name]|length }}</span></div>
+                    {% if city_name in data.city_addresses %}
+                    <small class="text-muted">{{ data.city_addresses[city_name].address }}, {{ data.city_addresses[city_name].zip_code }}</small>
+                    {% endif %}
                 </a>
                 {% endfor %}
             </div>
@@ -306,7 +321,14 @@
             {% for city_name, city_records in data.by_city.items()|sort %}
             <div class="city-detail" id="city-{{ city_name|replace(' ','')|replace(',','') }}" style="{% if not loop.first %}display:none{% endif %}">
                 <div class="card chart-card">
-                    <div class="card-header fs-5">{{ city_name }}</div>
+                    <div class="card-header fs-5">
+                        {{ city_name }}
+                        {% if city_name in data.city_addresses %}
+                        <span class="float-end fs-6 fw-normal text-muted">
+                            Address checked: <strong>{{ data.city_addresses[city_name].full }}</strong>
+                        </span>
+                        {% endif %}
+                    </div>
                     <div class="card-body">
                         <div id="chart-city-{{ city_name|replace(' ','')|replace(',','') }}" style="height:350px" class="mb-3"></div>
                         <table class="table table-sm table-hover">
@@ -474,6 +496,19 @@ function filterTable() {
             && price <= maxPrice;
         row.style.display = show ? '' : 'none';
     });
+}
+
+// Toggle address visibility in the pricing table
+let addressesVisible = false;
+function toggleAddresses() {
+    addressesVisible = !addressesVisible;
+    document.querySelectorAll('.address-col').forEach(el => {
+        el.style.display = addressesVisible ? 'inline' : 'none';
+    });
+    const btn = document.getElementById('btn-addr');
+    btn.textContent = addressesVisible ? 'Hide Addresses' : 'Show Addresses';
+    btn.classList.toggle('btn-outline-secondary', !addressesVisible);
+    btn.classList.toggle('btn-secondary', addressesVisible);
 }
 
 // City detail view

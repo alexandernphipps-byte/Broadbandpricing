@@ -70,18 +70,54 @@ def get_dashboard_data():
                     "plan": best["plan_name"],
                 }
 
-    # Speed tier comparison
+    # Speed tier definitions
     speed_tiers = [
         ("Basic (< 150 Mbps)", 0, 150),
         ("Mid (150-500 Mbps)", 150, 500),
         ("Fast (500-1 Gbps)", 500, 1100),
         ("Gigabit+ (1+ Gbps)", 1100, 100000),
     ]
+
+    # Comparison data grouped by CITY, then speed tier, then provider type
+    # FWA and Starlink are placed in the Basic tier regardless of speed
+    city_tier_comparison = {}
+    for city_name in sorted(by_city.keys()):
+        city_tier_comparison[city_name] = {}
+        for tier_name, min_s, max_s in speed_tiers:
+            city_tier_comparison[city_name][tier_name] = {}
+            for ptype in type_order:
+                if ptype in ("fwa", "starlink"):
+                    # FWA and Starlink go in Basic tier only
+                    if tier_name == "Basic (< 150 Mbps)":
+                        matches = [r for r in by_city[city_name] if r["provider_type"] == ptype]
+                    else:
+                        matches = []
+                else:
+                    matches = [
+                        r for r in by_city[city_name]
+                        if r["provider_type"] == ptype and min_s <= r["speed_down"] < max_s
+                    ]
+                if matches:
+                    best = min(matches, key=lambda r: r["monthly_price"])
+                    city_tier_comparison[city_name][tier_name][ptype] = {
+                        "price": best["monthly_price"],
+                        "speed": speed_label(best["speed_down"]),
+                        "provider": best["provider"],
+                        "plan": best["plan_name"],
+                    }
+
+    # Overall tier data (for the overview chart)
     tier_data = {}
     for tier_name, min_s, max_s in speed_tiers:
         tier_data[tier_name] = {}
         for ptype in type_order:
-            matches = [r for r in records if r["provider_type"] == ptype and min_s <= r["speed_down"] < max_s]
+            if ptype in ("fwa", "starlink"):
+                if tier_name == "Basic (< 150 Mbps)":
+                    matches = [r for r in records if r["provider_type"] == ptype]
+                else:
+                    matches = []
+            else:
+                matches = [r for r in records if r["provider_type"] == ptype and min_s <= r["speed_down"] < max_s]
             if matches:
                 best = min(matches, key=lambda r: r["monthly_price"])
                 tier_data[tier_name][ptype] = best["monthly_price"]
@@ -109,6 +145,8 @@ def get_dashboard_data():
         "total_plans": len(records),
         "by_city": {k: sorted(v, key=lambda r: (r["provider_type"], r["speed_down"])) for k, v in by_city.items()},
         "comparison": comparison,
+        "city_tier_comparison": city_tier_comparison,
+        "speed_tiers": [t[0] for t in speed_tiers],
         "tier_data": tier_data,
         "chart_cities": [c.split(",")[0] for c in chart_cities],
         "chart_series": chart_series,

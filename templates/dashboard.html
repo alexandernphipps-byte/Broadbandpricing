@@ -173,46 +173,45 @@
 
 <!-- Compare Cities Tab -->
 <div class="tab-pane fade" id="tab-compare">
-    {% for tier_name, tier_info in data.tier_data.items() %}
+    {% for city_name, tiers in data.city_tier_comparison.items() %}
     <div class="card chart-card">
-        <div class="card-header">{{ tier_name }}</div>
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fs-5">{{ city_name }}</span>
+            {% if city_name in data.city_addresses %}
+            <span class="fs-6 fw-normal text-muted">{{ data.city_addresses[city_name].full }}</span>
+            {% endif %}
+        </div>
         <div class="card-body">
-            <table class="table table-sm table-hover">
+            <table class="table table-sm table-hover mb-0">
                 <thead class="table-dark">
                     <tr>
-                        <th>City</th>
-                        <th class="comparison-cell">Cable</th>
-                        <th class="comparison-cell">ILEC Fiber</th>
-                        <th class="comparison-cell">Starlink</th>
-                        <th class="comparison-cell">FWA</th>
+                        <th style="width:22%">Speed Tier</th>
+                        <th class="comparison-cell" style="width:19.5%">Cable</th>
+                        <th class="comparison-cell" style="width:19.5%">ILEC Fiber</th>
+                        <th class="comparison-cell" style="width:19.5%">Starlink</th>
+                        <th class="comparison-cell" style="width:19.5%">FWA</th>
                     </tr>
                 </thead>
                 <tbody>
-                {% for city_name, types in data.comparison.items() %}
+                {% for tier_name in data.speed_tiers %}
+                    {% set tier = tiers.get(tier_name, {}) %}
+                    {% set has_data = tier|length > 0 %}
+                    {% if has_data %}
                     <tr>
-                        <td class="fw-bold">{{ city_name }}
-                            {% if city_name in data.city_addresses %}
-                            <br><small class="text-muted" style="cursor:pointer" onclick="var a=this.querySelector('.addr'),l=this.querySelector('.lbl');if(a.style.display==='none'){a.style.display='inline';l.textContent='Hide address'}else{a.style.display='none';l.textContent='Show address'}">
-                                &#128205; <span class="lbl">Show address</span><span class="addr" style="display:none"> — {{ data.city_addresses[city_name].full }}</span>
-                            </small>
-                            {% endif %}
-                        </td>
+                        <td class="fw-bold align-middle">{{ tier_name }}</td>
                         {% for ptype in data.type_order %}
                         <td class="comparison-cell">
-                            {% set matches = [] %}
-                            {% for r in data.by_city[city_name] %}
-                                {% if r.provider_type == ptype and r.speed_down >= tier_name.split('(')[1].split(')')[0].split('-')[0].split('<')[0].strip().replace(' Mbps','').replace(' Gbps','').replace('+','').replace('1','1000') | default(0, true) | int %}
-                                {% endif %}
-                            {% endfor %}
-                            {% if ptype in types %}
-                                <div class="comparison-price">${{ "%.2f"|format(types[ptype].price) }}</div>
-                                <div class="comparison-speed">{{ types[ptype].speed }}</div>
+                            {% if ptype in tier %}
+                                <div class="comparison-price">${{ "%.2f"|format(tier[ptype].price) }}</div>
+                                <div class="comparison-speed">{{ tier[ptype].provider }}</div>
+                                <div class="comparison-speed">{{ tier[ptype].speed }}</div>
                             {% else %}
                                 <span class="text-muted">-</span>
                             {% endif %}
                         </td>
                         {% endfor %}
                     </tr>
+                    {% endif %}
                 {% endfor %}
                 </tbody>
             </table>

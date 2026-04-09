@@ -170,11 +170,11 @@ def charts(days, city):
 
 
 @cli.command()
-@click.option("--time", "-t", "check_time", default=DAILY_CHECK_TIME, help="Time to run daily check (HH:MM)")
+@click.option("--time", "-t", "check_time", default=DAILY_CHECK_TIME, help="Time to run daily check in ET (HH:MM)")
 def schedule(check_time):
-    """Start the daily scheduler."""
+    """Start the daily scheduler (runs at 9 AM ET by default)."""
     init_db()
-    console.print(f"[bold]Starting daily pricing scheduler at {check_time}...[/bold]")
+    console.print(f"[bold]Starting daily pricing scheduler at {check_time} ET...[/bold]")
     run_scheduler(lambda: run_price_check(), check_time=check_time)
 
 

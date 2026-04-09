@@ -141,6 +141,7 @@
     <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#tab-compare">Compare Cities</a></li>
     <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#tab-table">Full Pricing Table</a></li>
     <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#tab-city">By City</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#tab-trends">Price Trends</a></li>
 </ul>
 
 <div class="tab-content">
@@ -360,6 +361,42 @@
     </div>
 </div>
 
+<!-- Price Trends Tab -->
+<div class="tab-pane fade" id="tab-trends">
+    <div class="card chart-card mb-3">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <span>Pricing Trends Over Time</span>
+                <small class="text-muted">Each chart shows the cheapest available plan per provider type. Hover for details.</small>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if data.check_dates|length < 2 %}
+            <div class="text-center py-4">
+                <p class="text-muted fs-5">Not enough data yet for trend charts.</p>
+                <p class="text-muted">Run <code>python app.py check</code> daily (or use <code>python app.py schedule</code>) to build up pricing history. Charts will appear after 2+ days of data.</p>
+            </div>
+            {% else %}
+            <p class="text-muted">Showing {{ data.check_dates|length }} days of pricing data.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% for city_name in data.city_tier_comparison.keys() %}
+    <div class="card chart-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fs-5">{{ city_name }}</span>
+            {% if city_name in data.city_addresses %}
+            <span class="fw-normal text-muted">{{ data.city_addresses[city_name].full }}</span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div id="trend-{{ city_name|replace(' ','')|replace(',','') }}" style="height:350px"></div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
 </div><!-- tab-content -->
 {% endif %}
 </div><!-- container -->
@@ -548,6 +585,77 @@ renderCityChart();
 renderTierChart();
 renderScatterChart();
 renderCityCharts();
+renderTrendCharts();
+
+// Render trend line charts per city
+function renderTrendCharts() {
+    const history = DATA.history_by_city || {};
+
+    for (const [cityKey, ptypeData] of Object.entries(history)) {
+        const divId = 'trend-' + cityKey.replace(/[\s,]/g, '');
+        const el = document.getElementById(divId);
+        if (!el) continue;
+
+        const traces = [];
+        for (const ptype of DATA.type_order) {
+            const series = ptypeData[ptype];
+            if (!series || series.length === 0) continue;
+
+            traces.push({
+                x: series.map(s => s.date),
+                y: series.map(s => s.price),
+                text: series.map(s => s.provider + '<br>' + s.plan + '<br>' + s.speed + ' Mbps'),
+                name: TYPE_NAMES[ptype],
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: {color: TYPE_COLORS[ptype], width: 3},
+                marker: {size: 8},
+                hovertemplate: '%{text}<br>$%{y:.2f}/mo<br>%{x}<extra>' + TYPE_NAMES[ptype] + '</extra>',
+                connectgaps: true,
+            });
+        }
+
+        // If no history data, show a message
+        if (traces.length === 0) {
+            el.innerHTML = '<p class="text-muted text-center py-4">No provider data available for this location.</p>';
+            continue;
+        }
+
+        // Check which provider types are missing
+        const available = new Set(Object.keys(ptypeData));
+        const missing = DATA.type_order.filter(t => !available.has(t));
+        let annotation = '';
+        if (missing.length > 0) {
+            const missingNames = missing.map(t => TYPE_NAMES[t]).join(', ');
+            annotation = missingNames + ': N/A at this address';
+        }
+
+        const annotations = annotation ? [{
+            text: annotation,
+            xref: 'paper', yref: 'paper',
+            x: 1, y: 1.08,
+            showarrow: false,
+            font: {size: 11, color: '#999'},
+            xanchor: 'right',
+        }] : [];
+
+        Plotly.newPlot(divId, traces, {
+            margin: {t: 30, b: 50, l: 60, r: 20},
+            yaxis: {title: 'Monthly Price ($)', tickprefix: '$'},
+            xaxis: {title: 'Date'},
+            legend: {orientation: 'h', y: 1.15},
+            plot_bgcolor: '#fafafa',
+            annotations: annotations,
+        }, {responsive: true});
+    }
+
+    // Handle cities with NO history at all
+    document.querySelectorAll('[id^="trend-"]').forEach(el => {
+        if (!el.hasChildNodes() || el.innerHTML.trim() === '') {
+            el.innerHTML = '<p class="text-muted text-center py-4">No pricing history available yet. Run a price check to start tracking.</p>';
+        }
+    });
+}
 
 // Re-render charts when tabs are shown (Plotly needs visible container)
 document.querySelectorAll('[data-bs-toggle="pill"]').forEach(tab => {

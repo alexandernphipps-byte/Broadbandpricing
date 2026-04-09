@@ -150,7 +150,7 @@ PROVIDER_TYPE_NAMES = {
 }
 
 # Schedule time for daily checks (24-hour format)
-DAILY_CHECK_TIME = "06:00"
+DAILY_CHECK_TIME = "09:00"
 
 # Database path
 import os

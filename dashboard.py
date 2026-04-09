@@ -135,6 +135,31 @@ def get_dashboard_data():
                 prices.append(None)
         chart_series[ptype] = prices
 
+    # Pricing history for trend charts (per city, per provider, cheapest plan per day)
+    history = get_pricing_history(days=365)
+    # Structure: city -> provider_type -> [{date, price, provider, plan, speed}]
+    history_by_city = defaultdict(lambda: defaultdict(list))
+    # Group history by date+city+provider_type, keep cheapest per group
+    hist_groups = defaultdict(list)
+    for h in history:
+        key = (h["check_date"], f"{h['city']}, {h['state']}", h["provider_type"])
+        hist_groups[key].append(h)
+
+    for (check_date, city_name, ptype), recs in hist_groups.items():
+        cheapest_rec = min(recs, key=lambda r: r["monthly_price"])
+        history_by_city[city_name][ptype].append({
+            "date": check_date,
+            "price": cheapest_rec["monthly_price"],
+            "provider": cheapest_rec["provider"],
+            "plan": cheapest_rec["plan_name"],
+            "speed": cheapest_rec["speed_down"],
+        })
+
+    # Sort each series by date
+    for city_name in history_by_city:
+        for ptype in history_by_city[city_name]:
+            history_by_city[city_name][ptype].sort(key=lambda x: x["date"])
+
     return {
         "records": records,
         "cities": cities,
@@ -153,6 +178,7 @@ def get_dashboard_data():
         "type_order": type_order,
         "city_addresses": city_addresses,
         "check_dates": get_all_check_dates(),
+        "history_by_city": dict(history_by_city),
     }
 
 

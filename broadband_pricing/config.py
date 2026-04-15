@@ -2,7 +2,7 @@
 
 from broadband_pricing.models import Location
 
-# 10 US cities geographically spread across the country
+# 24 US cities geographically spread across the country
 # Each city has: cable operator, ILEC fiber, Starlink, and FWA provider
 LOCATIONS = [
     Location(
@@ -123,6 +123,175 @@ LOCATIONS = [
             "ilec_fiber": "quantum_fiber",
             "starlink": "starlink",
             "fwa": "verizon_5g",
+        },
+    ),
+    # --- Newly added cities ---
+    Location(
+        city="Stamford",
+        state="CT",
+        address="1 Landmark Square",
+        zip_code="06901",
+        providers={
+            "cable": "spectrum",
+            "ilec_fiber": "verizon_fios",
+            "starlink": "starlink",
+            "fwa": "tmobile_home",
+        },
+    ),
+    Location(
+        city="Orlando",
+        state="FL",
+        address="400 S Orange Ave",
+        zip_code="32801",
+        providers={
+            "cable": "spectrum",
+            "ilec_fiber": "att_fiber",
+            "starlink": "starlink",
+            "fwa": "tmobile_home",
+        },
+    ),
+    Location(
+        city="San Antonio",
+        state="TX",
+        address="100 W Houston St",
+        zip_code="78205",
+        providers={
+            "cable": "spectrum",
+            "ilec_fiber": "att_fiber",
+            "starlink": "starlink",
+            "fwa": "att_air",
+        },
+    ),
+    Location(
+        city="San Diego",
+        state="CA",
+        address="402 W Broadway",
+        zip_code="92101",
+        providers={
+            "cable": "spectrum",
+            "ilec_fiber": "att_fiber",
+            "starlink": "starlink",
+            "fwa": "tmobile_home",
+        },
+    ),
+    Location(
+        city="Las Vegas",
+        state="NV",
+        address="300 S 4th St",
+        zip_code="89101",
+        providers={
+            "cable": "cox",
+            "ilec_fiber": "quantum_fiber",
+            "starlink": "starlink",
+            "fwa": "tmobile_home",
+        },
+    ),
+    Location(
+        city="Evanston",
+        state="IL",
+        address="1800 Sherman Ave",
+        zip_code="60201",
+        providers={
+            "cable": "xfinity",
+            "ilec_fiber": "att_fiber",
+            "starlink": "starlink",
+            "fwa": "tmobile_home",
+        },
+    ),
+    Location(
+        city="Hartford",
+        state="CT",
+        address="100 Pearl St",
+        zip_code="06103",
+        providers={
+            "cable": "xfinity",
+            "ilec_fiber": "quantum_fiber",
+            "starlink": "starlink",
+            "fwa": "tmobile_home",
+        },
+    ),
+    Location(
+        city="Fargo",
+        state="ND",
+        address="101 Broadway N",
+        zip_code="58102",
+        providers={
+            "cable": "xfinity",
+            "ilec_fiber": "quantum_fiber",
+            "starlink": "starlink",
+            "fwa": "tmobile_home",
+        },
+    ),
+    Location(
+        city="El Paso",
+        state="TX",
+        address="100 N Stanton St",
+        zip_code="79901",
+        providers={
+            "cable": "spectrum",
+            "ilec_fiber": "att_fiber",
+            "starlink": "starlink",
+            "fwa": "att_air",
+        },
+    ),
+    Location(
+        city="Kansas City",
+        state="MO",
+        address="1 Pershing Rd",
+        zip_code="64108",
+        providers={
+            "cable": "spectrum",
+            "ilec_fiber": "att_fiber",
+            "starlink": "starlink",
+            "fwa": "tmobile_home",
+        },
+    ),
+    Location(
+        city="Springfield",
+        state="MO",
+        address="830 Boonville Ave",
+        zip_code="65802",
+        providers={
+            "cable": "spectrum",
+            "ilec_fiber": "att_fiber",
+            "starlink": "starlink",
+            "fwa": "tmobile_home",
+        },
+    ),
+    Location(
+        city="Jacksonville",
+        state="FL",
+        address="220 E Bay St",
+        zip_code="32202",
+        providers={
+            "cable": "xfinity",
+            "ilec_fiber": "att_fiber",
+            "starlink": "starlink",
+            "fwa": "tmobile_home",
+        },
+    ),
+    Location(
+        city="Portland",
+        state="OR",
+        address="1000 SW Broadway",
+        zip_code="97205",
+        providers={
+            "cable": "xfinity",
+            "ilec_fiber": "quantum_fiber",
+            "starlink": "starlink",
+            "fwa": "tmobile_home",
+        },
+    ),
+    Location(
+        city="Madison",
+        state="WI",
+        address="1 S Pinckney St",
+        zip_code="53703",
+        providers={
+            "cable": "xfinity",
+            "ilec_fiber": "att_fiber",
+            "starlink": "starlink",
+            "fwa": "tmobile_home",
         },
     ),
 ]

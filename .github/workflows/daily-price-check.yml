@@ -1,0 +1,58 @@
+name: Daily Price Check
+
+on:
+  schedule:
+    - cron: '0 13 * * *'  # 9am ET (UTC-4 in summer / UTC-5 in winter)
+  workflow_dispatch:       # allows manual run from GitHub
+
+jobs:
+  check-prices:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download existing database
+        uses: actions/download-artifact@v4
+        with:
+          name: pricing-db
+          path: .
+        continue-on-error: true  # first run won't have a saved DB yet
+
+      - name: Run price check
+        run: python app.py check
+
+      - name: Save updated database
+        uses: actions/upload-artifact@v4
+        with:
+          name: pricing-db
+          path: broadband_pricing.db
+          retention-days: 90
+
+      - name: Export dashboard HTML
+        run: |
+          python dashboard.py &
+          sleep 5
+          curl -s http://localhost:5000/ > dashboard_export.html
+          kill %1
+
+      - name: Commit and push dashboard export
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dashboard_export.html
+          git diff --staged --quiet || git commit -m "chore: update dashboard export [$(date '+%Y-%m-%d')]"
+          git push origin main

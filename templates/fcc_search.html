@@ -116,6 +116,12 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── Table scroll trap fix ── */
+    /* Contain horizontal overscroll so vertical page-scroll passes through */
+    .table-responsive {
+      overscroll-behavior-x: contain;
+    }
+
     /* ── Responsive ── */
     @media (max-width: 767px) {
       .homes-bar-cell { display: none; }
@@ -263,6 +269,9 @@ async function initDropdown() {
     searchField: ['brand_name', 'holding_company'],
     valueField: 'provider_id',
     labelField: 'brand_name',
+    // Render dropdown at <body> level so it can't be clipped by card overflow
+    // and doesn't intercept page scroll events when positioned above the input.
+    dropdownParent: 'body',
     render: {
       option(data, escape) {
         const sub = data.holding_company && data.holding_company !== data.brand_name
@@ -506,7 +515,7 @@ function updateSortHeaders() {
 // ── UI state machine ───────────────────────────────────────────────────────
 function showState(state) {
   document.getElementById('loading-state').classList.toggle('show', state === 'loading');
-  document.getElementById('error-state').style.display   = state === 'error'   ? '' : 'none';
+  document.getElementById('error-state').style.display    = state === 'error'   ? 'block' : 'none';
   document.getElementById('empty-state').classList.toggle('show', state === 'empty');
   document.getElementById('results-section').style.display = state === 'results' ? '' : 'none';
 }

@@ -277,6 +277,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Provider dropdown ──────────────────────────────────────────────────────
 async function initDropdown() {
+  // Destroy any existing TomSelect instance before re-creating (handles Retry).
+  if (tomSelect) {
+    tomSelect.destroy();
+    tomSelect = null;
+  }
+
   tomSelect = new TomSelect('#provider-select', {
     placeholder: 'Loading FCC data…',
     searchField: ['brand_name', 'holding_company'],
@@ -586,13 +592,18 @@ function clearResults() {
 
 // ── CSV export ─────────────────────────────────────────────────────────────
 function exportCsv() {
+  const providerName = (tomSelect.options[tomSelect.getValue()]?.brand_name || 'provider')
+    .replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+  const dateBadge = document.getElementById('filing-date-badge').textContent
+    .replace('Filing: ', '').trim() || 'unknown_date';
+
   const headers = ['State', 'Abbr', 'Homes Passed', 'Business Locations', 'Total Locations'];
   const rows = allRows.map(r => [r.state_name, r.state_abbr, r.homes_passed, r.business_passed, r.total]);
   const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const a = Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(blob),
-    download: 'fcc_homes_passed.csv',
+    download: `fcc_${providerName}_${dateBadge}.csv`,
   });
   a.click();
 }

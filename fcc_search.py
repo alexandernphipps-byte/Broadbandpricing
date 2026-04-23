@@ -300,14 +300,18 @@ def api_homes_passed():
 
 # ── Entry point ────────────────────────────────────────────────────────────
 
-if __name__ == "__main__":
+def start():
     port  = int(os.environ.get("PORT", 5001))
-    debug = os.environ.get("FLASK_DEBUG", "1") == "1"
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
     print(f"\n  FCC BDC Provider Search  →  http://localhost:{port}\n")
     if not _USERNAME:
         print("  WARNING: FCC_USERNAME not set – API calls will likely fail.\n")
     if not _API_KEY:
         print("  WARNING: FCC_API_KEY not set – API calls will likely fail.\n")
-    # Kick off background data download immediately
     threading.Thread(target=load_bdc_data, daemon=True).start()
-    app.run(debug=debug, port=port, use_reloader=False)
+    # host='0.0.0.0' required for cloud deployments (Railway, Render, etc.)
+    app.run(host="0.0.0.0", port=port, debug=debug, use_reloader=False)
+
+
+if __name__ == "__main__":
+    start()

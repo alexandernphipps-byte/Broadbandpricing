@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FCC Broadband Provider Search</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Tom Select (searchable dropdown) -->
+  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --fcc-blue: #003087;
+      --fcc-red:  #c8102e;
+    }
+
+    body {
+      background: #f4f6fb;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Navbar ── */
+    .navbar {
+      background: linear-gradient(135deg, var(--fcc-blue), #1a4a8a) !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    .navbar-brand { font-weight: 700; letter-spacing: .4px; font-size: 1.15rem; }
+    .navbar-brand span { color: #ffd700; }
+
+    /* ── Search card ── */
+    .search-card {
+      border: none;
+      border-radius: 14px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.09);
+    }
+
+    /* ── Tom Select overrides ── */
+    .ts-wrapper.full { flex: 1 1 auto; }
+    .ts-control { border-radius: 8px !important; font-size: .97rem; padding: .55rem .75rem !important; }
+
+    /* ── Stats strip ── */
+    .stat-pill {
+      background: #fff;
+      border-radius: 50px;
+      padding: .35rem 1.1rem;
+      font-size: .85rem;
+      box-shadow: 0 1px 6px rgba(0,0,0,.08);
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .stat-pill .label { color: #6c757d; }
+    .stat-pill .value { font-weight: 700; color: var(--fcc-blue); }
+
+    /* ── Results card ── */
+    .results-card {
+      border: none;
+      border-radius: 14px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.09);
+    }
+
+    /* ── Table ── */
+    #results-table thead th {
+      background: var(--fcc-blue);
+      color: #fff;
+      font-weight: 600;
+      font-size: .82rem;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    #results-table thead th:hover { background: #1a4a8a; }
+    #results-table thead th .sort-icon { opacity: .5; font-size: .7rem; margin-left: 4px; }
+    #results-table thead th.sort-asc .sort-icon::after  { content: ' ▲'; }
+    #results-table thead th.sort-desc .sort-icon::after { content: ' ▼'; }
+    #results-table thead th:not(.sort-asc):not(.sort-desc) .sort-icon::after { content: ' ⇅'; }
+
+    #results-table tbody tr:hover { background: #eef3ff; }
+    #results-table tbody td { vertical-align: middle; font-size: .92rem; }
+
+    .homes-bar-cell { min-width: 200px; }
+    .homes-bar {
+      height: 10px;
+      border-radius: 5px;
+      background: linear-gradient(90deg, #2563eb, #60a5fa);
+      transition: width .4s ease;
+    }
+    .homes-bar-bg {
+      background: #e9ecef;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    /* ── Chart ── */
+    #chart-container { position: relative; height: 420px; }
+
+    /* ── States ── */
+    #empty-state, #error-state, #loading-state { display: none; }
+
+    #empty-state.show, #error-state.show, #loading-state.show { display: block; }
+
+    .spinner-fcc {
+      width: 2.5rem; height: 2.5rem;
+      border: .3rem solid #dee2e6;
+      border-top-color: var(--fcc-blue);
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Responsive ── */
+    @media (max-width: 767px) {
+      .homes-bar-cell { display: none; }
+      #chart-container { height: 320px; }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ── Navbar ── -->
+<nav class="navbar navbar-dark mb-4">
+  <div class="container-lg">
+    <span class="navbar-brand">
+      <span>FCC</span> Broadband Coverage Search
+    </span>
+    <span class="text-white-50 small">Broadband Data Collection · National Broadband Map</span>
+  </div>
+</nav>
+
+<div class="container-lg pb-5">
+
+  <!-- ── Search card ── -->
+  <div class="card search-card mb-4 p-4">
+    <h5 class="fw-bold mb-1" style="color:var(--fcc-blue)">Search by Provider</h5>
+    <p class="text-muted small mb-3">
+      Select a broadband provider to see how many homes (residential locations)
+      they have passed in each state, as reported to the FCC.
+    </p>
+    <div class="d-flex gap-3 flex-wrap align-items-end">
+      <div class="flex-grow-1" style="min-width:280px; max-width:620px">
+        <label class="form-label fw-semibold small mb-1" for="provider-select">Provider</label>
+        <select id="provider-select" placeholder="Type to search providers…"></select>
+      </div>
+      <button id="search-btn" class="btn btn-primary px-4" style="background:var(--fcc-blue);border-color:var(--fcc-blue);" disabled>
+        Search
+      </button>
+      <button id="clear-btn" class="btn btn-outline-secondary px-3" style="display:none">
+        Clear
+      </button>
+    </div>
+
+    <!-- provider load error -->
+    <div id="provider-error" class="alert alert-danger mt-3 py-2 small" style="display:none"></div>
+  </div>
+
+  <!-- ── Loading ── -->
+  <div id="loading-state" class="text-center py-5">
+    <div class="spinner-fcc mb-3"></div>
+    <p class="text-muted">Fetching data from the FCC…</p>
+  </div>
+
+  <!-- ── Error ── -->
+  <div id="error-state">
+    <div class="alert alert-danger d-flex align-items-start gap-2">
+      <span style="font-size:1.3rem">⚠️</span>
+      <div>
+        <strong>Could not load data</strong>
+        <div id="error-message" class="small mt-1"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Empty (initial) ── -->
+  <div id="empty-state" class="show text-center py-5 text-muted">
+    <div style="font-size:3rem; opacity:.25">📡</div>
+    <p class="mt-2">Select a provider above and click <strong>Search</strong>.</p>
+  </div>
+
+  <!-- ── Results ── -->
+  <div id="results-section" style="display:none">
+
+    <!-- Summary stats -->
+    <div class="d-flex flex-wrap gap-2 mb-3" id="stats-strip"></div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-0" id="result-tabs">
+      <li class="nav-item">
+        <button class="nav-link active" data-tab="table">📋 Table</button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" data-tab="chart">📊 Chart</button>
+      </li>
+    </ul>
+
+    <div class="card results-card rounded-top-0">
+
+      <!-- Table tab -->
+      <div id="tab-table" class="p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+          <input id="table-filter" class="form-control form-control-sm w-auto" style="min-width:200px"
+                 placeholder="Filter states…" autocomplete="off">
+          <button id="export-csv-btn" class="btn btn-sm btn-outline-secondary">⬇ Export CSV</button>
+        </div>
+        <div class="table-responsive">
+          <table id="results-table" class="table table-hover table-bordered align-middle mb-0">
+            <thead>
+              <tr>
+                <th data-col="rank">#<span class="sort-icon"></span></th>
+                <th data-col="state_name">State<span class="sort-icon"></span></th>
+                <th data-col="homes_passed">Homes Passed<span class="sort-icon"></span></th>
+                <th class="homes-bar-cell">Coverage</th>
+                <th data-col="business_passed">Business Locations<span class="sort-icon"></span></th>
+                <th data-col="total">Total Locations<span class="sort-icon"></span></th>
+              </tr>
+            </thead>
+            <tbody id="results-tbody"></tbody>
+          </table>
+        </div>
+        <p class="text-muted small mt-2 mb-0" id="row-count"></p>
+      </div>
+
+      <!-- Chart tab -->
+      <div id="tab-chart" class="p-3" style="display:none">
+        <div id="chart-container">
+          <canvas id="bar-chart"></canvas>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div><!-- /container -->
+
+<!-- Tom Select -->
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let allRows = [];
+let sortCol = 'homes_passed';
+let sortDir = 'desc';
+let chartInstance = null;
+let tomSelect = null;
+
+// ── Init ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initDropdown();
+  setupEventListeners();
+});
+
+// ── Provider dropdown ──────────────────────────────────────────────────────
+async function initDropdown() {
+  tomSelect = new TomSelect('#provider-select', {
+    placeholder: 'Loading providers…',
+    searchField: ['brand_name', 'holding_company'],
+    valueField: 'provider_id',
+    labelField: 'brand_name',
+    render: {
+      option(data, escape) {
+        const sub = data.holding_company && data.holding_company !== data.brand_name
+          ? `<small class="text-muted d-block">${escape(data.holding_company)}</small>`
+          : '';
+        return `<div>${escape(data.brand_name)}${sub}</div>`;
+      },
+      item(data, escape) {
+        return `<div>${escape(data.brand_name)}</div>`;
+      },
+    },
+    onChange(val) {
+      document.getElementById('search-btn').disabled = !val;
+    },
+  });
+
+  try {
+    const res = await fetch('/api/providers');
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
+
+    const providers = json.providers || [];
+    if (!providers.length) throw new Error('No providers returned by the FCC API.');
+
+    tomSelect.clearOptions();
+    tomSelect.addOptions(providers);
+    tomSelect.settings.placeholder = 'Type to search providers…';
+    tomSelect.inputState();
+    tomSelect.enable();
+  } catch (err) {
+    const el = document.getElementById('provider-error');
+    el.textContent = `Could not load providers: ${err.message}`;
+    el.style.display = 'block';
+    tomSelect.disable();
+  }
+}
+
+// ── Events ─────────────────────────────────────────────────────────────────
+function setupEventListeners() {
+  document.getElementById('search-btn').addEventListener('click', doSearch);
+  document.getElementById('clear-btn').addEventListener('click', clearResults);
+  document.getElementById('table-filter').addEventListener('input', applyFilter);
+  document.getElementById('export-csv-btn').addEventListener('click', exportCsv);
+
+  // Tab switching
+  document.querySelectorAll('[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
+  // Column sort
+  document.querySelectorAll('#results-table thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (sortCol === col) {
+        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortCol = col;
+        sortDir = col === 'state_name' ? 'asc' : 'desc';
+      }
+      renderTable(currentFilteredRows());
+      updateSortHeaders();
+    });
+  });
+}
+
+// ── Search ─────────────────────────────────────────────────────────────────
+async function doSearch() {
+  const providerId = tomSelect.getValue();
+  if (!providerId) return;
+
+  showState('loading');
+  document.getElementById('clear-btn').style.display = 'none';
+
+  try {
+    const res = await fetch(`/api/homes-passed?provider_id=${encodeURIComponent(providerId)}`);
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
+
+    allRows = json.states || [];
+    if (!allRows.length) throw new Error('No state data returned for this provider.');
+
+    renderResults();
+    showState('results');
+    document.getElementById('clear-btn').style.display = '';
+  } catch (err) {
+    document.getElementById('error-message').textContent = err.message;
+    showState('error');
+  }
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function renderResults() {
+  // Add rank and total
+  const maxHomes = Math.max(...allRows.map(r => r.homes_passed), 1);
+  allRows = allRows.map((r, i) => ({
+    ...r,
+    rank: i + 1,
+    total: r.homes_passed + r.business_passed,
+    _pct: r.homes_passed / maxHomes,
+  }));
+
+  renderStatsStrip();
+  sortDir = 'desc'; sortCol = 'homes_passed';
+  updateSortHeaders();
+  renderTable(allRows);
+  renderChart(allRows.slice().sort((a,b) => b.homes_passed - a.homes_passed).slice(0, 20));
+}
+
+function renderStatsStrip() {
+  const totalHomes = allRows.reduce((s, r) => s + r.homes_passed, 0);
+  const totalBiz   = allRows.reduce((s, r) => s + r.business_passed, 0);
+  const stateCount = allRows.filter(r => r.homes_passed > 0).length;
+  const topState   = allRows[0];
+
+  const strip = document.getElementById('stats-strip');
+  strip.innerHTML = `
+    <div class="stat-pill">
+      <span class="label">Total Homes Passed</span>
+      <span class="value">${fmt(totalHomes)}</span>
+    </div>
+    <div class="stat-pill">
+      <span class="label">Business Locations</span>
+      <span class="value">${fmt(totalBiz)}</span>
+    </div>
+    <div class="stat-pill">
+      <span class="label">States with Coverage</span>
+      <span class="value">${stateCount}</span>
+    </div>
+    ${topState ? `<div class="stat-pill">
+      <span class="label">Top State</span>
+      <span class="value">${topState.state_name} (${fmt(topState.homes_passed)})</span>
+    </div>` : ''}
+  `;
+}
+
+function currentFilteredRows() {
+  const filter = document.getElementById('table-filter').value.toLowerCase();
+  return filter
+    ? allRows.filter(r => r.state_name.toLowerCase().includes(filter))
+    : allRows;
+}
+
+function applyFilter() {
+  renderTable(currentFilteredRows());
+}
+
+function renderTable(rows) {
+  const maxHomes = Math.max(...allRows.map(r => r.homes_passed), 1);
+
+  const sorted = [...rows].sort((a, b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ?  1 : -1;
+    return 0;
+  });
+
+  const tbody = document.getElementById('results-tbody');
+  tbody.innerHTML = sorted.map((r, i) => {
+    const barPct = ((r.homes_passed / maxHomes) * 100).toFixed(1);
+    return `
+      <tr>
+        <td class="text-muted">${i + 1}</td>
+        <td class="fw-semibold">${esc(r.state_name)}${r.state_abbr ? ` <span class="badge bg-secondary fw-normal">${esc(r.state_abbr)}</span>` : ''}</td>
+        <td class="fw-bold text-primary">${fmt(r.homes_passed)}</td>
+        <td class="homes-bar-cell">
+          <div class="homes-bar-bg">
+            <div class="homes-bar" style="width:${barPct}%"></div>
+          </div>
+        </td>
+        <td>${fmt(r.business_passed)}</td>
+        <td>${fmt(r.total)}</td>
+      </tr>`;
+  }).join('');
+
+  document.getElementById('row-count').textContent =
+    `Showing ${sorted.length} of ${allRows.length} states`;
+}
+
+function renderChart(rows) {
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  const ctx = document.getElementById('bar-chart').getContext('2d');
+  const labels = rows.map(r => r.state_abbr || r.state_name);
+  const values = rows.map(r => r.homes_passed);
+
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Homes Passed',
+        data: values,
+        backgroundColor: 'rgba(37,99,235,.75)',
+        borderColor: 'rgba(37,99,235,1)',
+        borderWidth: 1,
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${fmt(ctx.parsed.y)} homes passed`,
+          },
+        },
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          ticks: {
+            callback: v => fmtShort(v),
+          },
+        },
+      },
+    },
+  });
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('[data-tab]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.getElementById('tab-table').style.display = tab === 'table' ? '' : 'none';
+  document.getElementById('tab-chart').style.display = tab === 'chart'  ? '' : 'none';
+}
+
+// ── Sort header indicators ─────────────────────────────────────────────────
+function updateSortHeaders() {
+  document.querySelectorAll('#results-table thead th[data-col]').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.col === sortCol) th.classList.add(`sort-${sortDir}`);
+  });
+}
+
+// ── UI state machine ───────────────────────────────────────────────────────
+function showState(state) {
+  document.getElementById('loading-state').classList.toggle('show', state === 'loading');
+  document.getElementById('error-state').style.display   = state === 'error'   ? '' : 'none';
+  document.getElementById('empty-state').classList.toggle('show', state === 'empty');
+  document.getElementById('results-section').style.display = state === 'results' ? '' : 'none';
+}
+
+function clearResults() {
+  allRows = [];
+  showState('empty');
+  tomSelect.clear();
+  document.getElementById('search-btn').disabled = true;
+  document.getElementById('clear-btn').style.display = 'none';
+  document.getElementById('table-filter').value = '';
+}
+
+// ── CSV export ─────────────────────────────────────────────────────────────
+function exportCsv() {
+  const headers = ['State', 'Abbr', 'Homes Passed', 'Business Locations', 'Total Locations'];
+  const rows = allRows.map(r => [r.state_name, r.state_abbr, r.homes_passed, r.business_passed, r.total]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: 'fcc_homes_passed.csv',
+  });
+  a.click();
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function fmt(n)      { return n ? n.toLocaleString() : '—'; }
+function fmtShort(n) {
+  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n/1e3).toFixed(0) + 'K';
+  return n;
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+
+</body>
+</html>

@@ -367,6 +367,29 @@ def api_debug():
     return jsonify(out)
 
 
+@app.route("/api/debug-csv")
+def api_debug_csv():
+    """Download and unzip the target file, then show the CSV headers and first 2 rows."""
+    file_id = int(request.args.get("file_id", 1559987))
+    h = _headers()
+    try:
+        r = requests.get(f"{BDC_BASE}/map/downloads/downloadFile/availability/{file_id}", headers=h, timeout=180)
+        r.raise_for_status()
+        raw = _maybe_unzip(r.content)
+        text = raw.decode("utf-8", errors="replace")
+        delim = "|" if text.count("|") > text.count(",") else ","
+        reader = csv.DictReader(io.StringIO(text), delimiter=delim)
+        headers = reader.fieldnames
+        rows = []
+        for i, row in enumerate(reader):
+            if i >= 3:
+                break
+            rows.append(dict(row))
+        return jsonify({"delimiter": delim, "headers": headers, "sample_rows": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/debug-download")
 def api_debug_download():
     """Try every known FCC download URL pattern for file_id=1559987 and report results."""

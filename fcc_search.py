@@ -18,6 +18,7 @@ import csv
 import io
 import os
 import threading
+import zipfile
 from datetime import datetime
 
 import requests
@@ -168,7 +169,8 @@ def load_bdc_data() -> None:
         else:
             raise RuntimeError(f"No file_id or URL found for file: {target}")
 
-        _set_status("loading", "Parsing CSV…")
+        _set_status("loading", "Extracting and parsing CSV…")
+        raw = _maybe_unzip(raw)
         by_provider = _parse_csv(raw)
 
         if not by_provider:
@@ -228,6 +230,16 @@ def _pick_summary_file(files: list) -> dict | None:
 
     ranked = sorted(files, key=_score, reverse=True)
     return ranked[0] if ranked else None
+
+
+def _maybe_unzip(raw: bytes) -> bytes:
+    """If raw bytes are a ZIP archive, extract and return the first CSV inside."""
+    if raw[:2] != b'PK':
+        return raw
+    with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+        csv_names = [n for n in zf.namelist() if n.lower().endswith('.csv')]
+        target = csv_names[0] if csv_names else zf.namelist()[0]
+        return zf.read(target)
 
 
 def _parse_csv(raw: bytes) -> dict:

@@ -81,15 +81,18 @@ def load_bdc_data() -> None:
         if not dates:
             raise RuntimeError("No filing dates returned by the API.")
 
-        # Try dates newest-first until we find one that has data files
-        all_dates = sorted(
-            [d.get("as_of_date") or d.get("date") or d if isinstance(d, dict) else d for d in dates],
+        # Only use availability dates (not challenge dates which have no files)
+        availability_dates = sorted(
+            [d["as_of_date"] for d in dates
+             if isinstance(d, dict) and d.get("data_type") == "availability"],
             reverse=True
         )
+        if not availability_dates:
+            raise RuntimeError("No availability filing dates found in API response.")
 
         files = []
         as_of_date = None
-        for candidate in all_dates:
+        for candidate in availability_dates:
             _set_status("loading", f"Checking files for {candidate}…")
             files_raw = _get(f"/map/downloads/listAvailabilityData/{candidate}")
             files = files_raw.get("data", files_raw) if isinstance(files_raw, dict) else files_raw
@@ -99,8 +102,7 @@ def load_bdc_data() -> None:
 
         if not files or not as_of_date:
             raise RuntimeError(
-                f"No data files found in any of these filing dates: {all_dates}. "
-                f"The FCC BDC API may require different endpoint paths."
+                f"No data files found for any availability date: {availability_dates}"
             )
 
         target = _pick_summary_file(files)
@@ -288,8 +290,14 @@ def api_debug():
             reverse=True
         )
         out["dates"] = all_dates
+        availability_dates = sorted(
+            [d["as_of_date"] for d in dates
+             if isinstance(d, dict) and d.get("data_type") == "availability"],
+            reverse=True
+        )
+        out["availability_dates"] = availability_dates
         out["files_by_date"] = {}
-        for d in all_dates[:5]:  # check the 5 most recent dates
+        for d in availability_dates[:5]:  # check the 5 most recent availability dates
             try:
                 fr = _get(f"/map/downloads/listAvailabilityData/{d}")
                 out["files_by_date"][str(d)] = fr

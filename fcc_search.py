@@ -81,13 +81,27 @@ def load_bdc_data() -> None:
         if not dates:
             raise RuntimeError("No filing dates returned by the API.")
 
-        as_of_date = _pick_latest_date(dates)
-        _set_status("loading", f"Listing data files for {as_of_date}…")
+        # Try dates newest-first until we find one that has data files
+        all_dates = sorted(
+            [d.get("as_of_date") or d.get("date") or d if isinstance(d, dict) else d for d in dates],
+            reverse=True
+        )
 
-        files_raw = _get(f"/map/downloads/listAvailabilityData/{as_of_date}")
-        files = files_raw.get("data", files_raw) if isinstance(files_raw, dict) else files_raw
-        if not files:
-            raise RuntimeError(f"No data files listed for filing date {as_of_date!r}.")
+        files = []
+        as_of_date = None
+        for candidate in all_dates:
+            _set_status("loading", f"Checking files for {candidate}…")
+            files_raw = _get(f"/map/downloads/listAvailabilityData/{candidate}")
+            files = files_raw.get("data", files_raw) if isinstance(files_raw, dict) else files_raw
+            if files:
+                as_of_date = candidate
+                break
+
+        if not files or not as_of_date:
+            raise RuntimeError(
+                f"No data files found in any of these filing dates: {all_dates}. "
+                f"The FCC BDC API may require different endpoint paths."
+            )
 
         target = _pick_summary_file(files)
         if not target:
@@ -259,6 +273,31 @@ def api_status():
             "message":    _cache["message"],
             "as_of_date": _cache["as_of_date"],
         })
+
+
+@app.route("/api/debug")
+def api_debug():
+    """Show raw FCC API responses to help diagnose endpoint/format issues."""
+    out = {}
+    try:
+        dates_raw = _get("/map/listAsOfDates")
+        out["listAsOfDates_raw"] = dates_raw
+        dates = dates_raw.get("data", dates_raw) if isinstance(dates_raw, dict) else dates_raw
+        all_dates = sorted(
+            [d.get("as_of_date") or d.get("date") or d if isinstance(d, dict) else d for d in dates],
+            reverse=True
+        )
+        out["dates"] = all_dates
+        out["files_by_date"] = {}
+        for d in all_dates[:5]:  # check the 5 most recent dates
+            try:
+                fr = _get(f"/map/downloads/listAvailabilityData/{d}")
+                out["files_by_date"][str(d)] = fr
+            except Exception as e:
+                out["files_by_date"][str(d)] = {"error": str(e)}
+    except Exception as e:
+        out["error"] = str(e)
+    return jsonify(out)
 
 
 @app.route("/api/reload", methods=["POST"])

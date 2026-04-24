@@ -108,22 +108,26 @@ def load_bdc_data() -> None:
         target = _pick_summary_file(files)
         if not target:
             raise RuntimeError(
-                f"Could not identify a state-level provider summary file. "
+                f"Could not identify a provider summary file. "
                 f"Files available: {[f.get('file_name') or f.get('name') for f in files]}"
             )
 
+        fname = target.get("file_name") or target.get("name") or "data"
+        _set_status("loading", f"Downloading {fname}…")
+
+        # The FCC API returns file_id but no direct URL — use file_id to download
+        file_id = target.get("file_id")
         file_url = (
             target.get("file_url")
             or target.get("url")
             or target.get("download_url")
             or target.get("link")
+            or (f"/map/downloads/getAvailabilityData/{file_id}" if file_id else None)
         )
         if not file_url:
-            raise RuntimeError(f"Selected file has no download URL: {target}")
+            raise RuntimeError(f"Cannot determine download URL for file: {target}")
 
-        fname = target.get("file_name") or target.get("name") or "data"
-        _set_status("loading", f"Downloading {fname}…")
-        raw = _download(file_url)
+        raw = _download(file_url) if file_url.startswith("http") else _download(f"{BDC_BASE}{file_url}")
 
         _set_status("loading", "Parsing CSV…")
         by_provider = _parse_csv(raw)
@@ -168,15 +172,19 @@ def _pick_latest_date(dates: list):
 
 
 def _pick_summary_file(files: list) -> dict | None:
-    """Rank available files and return the most likely state × provider summary."""
+    """Rank available files and return the best provider summary file."""
     def _score(f: dict) -> int:
         name = (f.get("file_name") or f.get("name") or "").lower()
+        subcat = (f.get("subcategory") or "").lower()
+        scope = (f.get("state_name") or "")  # empty = national scope
         s = 0
-        if "state"        in name: s += 4
-        if "provider"     in name: s += 3
-        if "summary"      in name: s += 2
-        if "availability" in name: s += 1
-        if "national"     in name: s += 1
+        # Prefer national-level (state_name is None/empty = all states)
+        if not scope:                        s += 5
+        if subcat == "provider summary":     s += 4
+        if "provider" in subcat:             s += 3
+        if "summary"  in name:               s += 2
+        if "provider" in name:               s += 2
+        if "us"       in name:               s += 1
         return s
 
     ranked = sorted(files, key=_score, reverse=True)

@@ -64,12 +64,32 @@ def _download(url: str) -> bytes:
 
 
 def _download_by_file_id(file_id: int) -> bytes:
-    """Download a BDC file using its file_id via POST (FCC API requirement)."""
-    url = f"{BDC_BASE}/map/downloads/getAvailabilityData"
-    h = {**_headers(), "Content-Type": "application/json"}
-    r = requests.post(url, json={"file_id": file_id}, headers=h, timeout=180)
-    r.raise_for_status()
-    return r.content
+    """Download a BDC file by file_id, trying known FCC endpoint patterns."""
+    h = _headers()
+    attempts = [
+        # GET with query parameter
+        lambda: requests.get(
+            f"{BDC_BASE}/map/downloads/getAvailabilityData",
+            params={"file_id": file_id}, headers=h, timeout=180),
+        # GET with file_id in path
+        lambda: requests.get(
+            f"{BDC_BASE}/map/downloads/availability/{file_id}",
+            headers=h, timeout=180),
+        # POST with file_id in body
+        lambda: requests.post(
+            f"{BDC_BASE}/map/downloads/getAvailabilityData/{file_id}",
+            headers={**h, "Content-Type": "application/json"}, timeout=180),
+    ]
+    last_err = None
+    for attempt in attempts:
+        try:
+            r = attempt()
+            if r.status_code == 200:
+                return r.content
+            last_err = f"{r.status_code} {r.text[:120]}"
+        except Exception as e:
+            last_err = str(e)
+    raise RuntimeError(f"All download attempts failed for file_id={file_id}. Last error: {last_err}")
 
 
 # ── Background data loader ─────────────────────────────────────────────────

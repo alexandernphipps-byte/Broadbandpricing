@@ -63,6 +63,15 @@ def _download(url: str) -> bytes:
     return r.content
 
 
+def _download_by_file_id(file_id: int) -> bytes:
+    """Download a BDC file using its file_id via POST (FCC API requirement)."""
+    url = f"{BDC_BASE}/map/downloads/getAvailabilityData"
+    h = {**_headers(), "Content-Type": "application/json"}
+    r = requests.post(url, json={"file_id": file_id}, headers=h, timeout=180)
+    r.raise_for_status()
+    return r.content
+
+
 # ── Background data loader ─────────────────────────────────────────────────
 
 def _set_status(status: str, message: str = "") -> None:
@@ -115,19 +124,20 @@ def load_bdc_data() -> None:
         fname = target.get("file_name") or target.get("name") or "data"
         _set_status("loading", f"Downloading {fname}…")
 
-        # The FCC API returns file_id but no direct URL — use file_id to download
+        # FCC API returns file_id with no direct URL; download via POST
         file_id = target.get("file_id")
         file_url = (
             target.get("file_url")
             or target.get("url")
             or target.get("download_url")
             or target.get("link")
-            or (f"/map/downloads/getAvailabilityData/{file_id}" if file_id else None)
         )
-        if not file_url:
-            raise RuntimeError(f"Cannot determine download URL for file: {target}")
-
-        raw = _download(file_url) if file_url.startswith("http") else _download(f"{BDC_BASE}{file_url}")
+        if file_id:
+            raw = _download_by_file_id(file_id)
+        elif file_url:
+            raw = _download(file_url)
+        else:
+            raise RuntimeError(f"No file_id or URL found for file: {target}")
 
         _set_status("loading", "Parsing CSV…")
         by_provider = _parse_csv(raw)

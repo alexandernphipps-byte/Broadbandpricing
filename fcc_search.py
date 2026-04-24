@@ -367,6 +367,36 @@ def api_debug():
     return jsonify(out)
 
 
+@app.route("/api/debug-files")
+def api_debug_files():
+    """List all files available for the most recent availability date."""
+    try:
+        dates_raw = _get("/map/listAsOfDates")
+        dates = dates_raw.get("data", dates_raw) if isinstance(dates_raw, dict) else dates_raw
+        availability_dates = sorted(
+            [d["as_of_date"] for d in dates if isinstance(d, dict) and d.get("data_type") == "availability"],
+            reverse=True
+        )
+        if not availability_dates:
+            return jsonify({"error": "No availability dates found"})
+        date = availability_dates[0]
+        files_raw = _get(f"/map/downloads/listAvailabilityData/{date}")
+        files = files_raw.get("data", files_raw) if isinstance(files_raw, dict) else files_raw
+        summary = [
+            {
+                "file_id":    f.get("file_id"),
+                "file_name":  f.get("file_name") or f.get("name"),
+                "subcategory": f.get("subcategory"),
+                "state_name": f.get("state_name"),
+                "file_size":  f.get("file_size") or f.get("size"),
+            }
+            for f in (files if isinstance(files, list) else [])
+        ]
+        return jsonify({"as_of_date": date, "file_count": len(summary), "files": summary})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/debug-csv")
 def api_debug_csv():
     """Download and unzip the target file, then show the CSV headers and first 2 rows."""

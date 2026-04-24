@@ -67,18 +67,27 @@ def _download_by_file_id(file_id: int) -> bytes:
     """Download a BDC file by file_id, trying known FCC endpoint patterns."""
     h = _headers()
     attempts = [
-        # GET with query parameter
+        # Correct FCC BDC endpoint: /map/downloads/downloadFile/availability/{file_id}/{file_type}
+        # file_type: 1=Shapefile, 2=GeoPackage, 3=CSV (try without suffix first)
+        lambda: requests.get(
+            f"{BDC_BASE}/map/downloads/downloadFile/availability/{file_id}",
+            headers=h, timeout=180),
+        lambda: requests.get(
+            f"{BDC_BASE}/map/downloads/downloadFile/availability/{file_id}/3",
+            headers=h, timeout=180),
+        lambda: requests.get(
+            f"{BDC_BASE}/map/downloads/downloadFile/availability/{file_id}/csv",
+            headers=h, timeout=180),
+        lambda: requests.get(
+            f"{BDC_BASE}/map/downloads/downloadFile/availability/{file_id}/1",
+            headers=h, timeout=180),
+        lambda: requests.get(
+            f"{BDC_BASE}/map/downloads/downloadFile/availability/{file_id}/2",
+            headers=h, timeout=180),
+        # Fallback: legacy query-param pattern
         lambda: requests.get(
             f"{BDC_BASE}/map/downloads/getAvailabilityData",
             params={"file_id": file_id}, headers=h, timeout=180),
-        # GET with file_id in path
-        lambda: requests.get(
-            f"{BDC_BASE}/map/downloads/availability/{file_id}",
-            headers=h, timeout=180),
-        # POST with file_id in body
-        lambda: requests.post(
-            f"{BDC_BASE}/map/downloads/getAvailabilityData/{file_id}",
-            headers={**h, "Content-Type": "application/json"}, timeout=180),
     ]
     last_err = None
     for attempt in attempts:
@@ -344,6 +353,38 @@ def api_debug():
     except Exception as e:
         out["error"] = str(e)
     return jsonify(out)
+
+
+@app.route("/api/debug-download")
+def api_debug_download():
+    """Try every known FCC download URL pattern for file_id=1559987 and report results."""
+    file_id = int(request.args.get("file_id", 1559987))
+    h = _headers()
+    patterns = [
+        ("GET downloadFile/availability/{id}",       "GET", f"{BDC_BASE}/map/downloads/downloadFile/availability/{file_id}"),
+        ("GET downloadFile/availability/{id}/3",     "GET", f"{BDC_BASE}/map/downloads/downloadFile/availability/{file_id}/3"),
+        ("GET downloadFile/availability/{id}/csv",   "GET", f"{BDC_BASE}/map/downloads/downloadFile/availability/{file_id}/csv"),
+        ("GET downloadFile/availability/{id}/1",     "GET", f"{BDC_BASE}/map/downloads/downloadFile/availability/{file_id}/1"),
+        ("GET downloadFile/availability/{id}/2",     "GET", f"{BDC_BASE}/map/downloads/downloadFile/availability/{file_id}/2"),
+        ("GET getAvailabilityData?file_id={id}",     "GET", f"{BDC_BASE}/map/downloads/getAvailabilityData"),
+        ("GET availability/{id}",                    "GET", f"{BDC_BASE}/map/downloads/availability/{file_id}"),
+        ("POST getAvailabilityData/{id}",            "POST", f"{BDC_BASE}/map/downloads/getAvailabilityData/{file_id}"),
+    ]
+    results = []
+    for label, method, url in patterns:
+        try:
+            if method == "POST":
+                r = requests.post(url, headers={**h, "Content-Type": "application/json"}, timeout=30)
+            elif "getAvailabilityData?file_id" in label:
+                r = requests.get(url, params={"file_id": file_id}, headers=h, timeout=30)
+            else:
+                r = requests.get(url, headers=h, timeout=30)
+            content_type = r.headers.get("Content-Type", "")
+            preview = r.text[:200] if "json" in content_type or r.status_code != 200 else f"[binary {len(r.content)} bytes]"
+            results.append({"pattern": label, "status": r.status_code, "content_type": content_type, "preview": preview})
+        except Exception as e:
+            results.append({"pattern": label, "error": str(e)})
+    return jsonify({"file_id": file_id, "results": results})
 
 
 @app.route("/api/reload", methods=["POST"])

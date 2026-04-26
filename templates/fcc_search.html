@@ -289,6 +289,17 @@ async function initDropdown() {
   });
 
   try {
+    // Check credentials first so we can surface a clear error
+    const statusRes = await fetch('/api/status');
+    const status = await statusRes.json();
+    if (!status.has_username || !status.has_api_key) {
+      const missing = [
+        !status.has_username ? 'FCC_USERNAME' : null,
+        !status.has_api_key  ? 'FCC_API_KEY'  : null,
+      ].filter(Boolean).join(', ');
+      throw new Error(`Missing environment variable(s): ${missing}. Set them in Railway → Variables tab.`);
+    }
+
     const res = await fetch('/api/providers');
     const json = await res.json();
     if (json.error) throw new Error(json.error);

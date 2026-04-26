@@ -23,8 +23,17 @@ _USERNAME = os.environ.get("FCC_USERNAME", "")
 _API_KEY = os.environ.get("FCC_API_KEY", "")
 
 
-def _auth():
-    return (_USERNAME, _API_KEY) if _USERNAME and _API_KEY else None
+def _fcc_headers() -> dict:
+    """Build request headers. FCC uses custom username/x-api-key headers, not Basic Auth."""
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (compatible; BroadbandPricingApp/1.0)",
+    }
+    if _USERNAME:
+        headers["username"] = _USERNAME
+    if _API_KEY:
+        headers["x-api-key"] = _API_KEY
+    return headers
 
 
 def _fcc_get(path: str, params: dict | None = None):
@@ -32,8 +41,7 @@ def _fcc_get(path: str, params: dict | None = None):
     resp = requests.get(
         url,
         params=params,
-        headers={"Accept": "application/json"},
-        auth=_auth(),
+        headers=_fcc_headers(),
         timeout=30,
     )
     resp.raise_for_status()
@@ -53,9 +61,20 @@ def index():
 # API proxy routes (keep credentials server-side)
 # ---------------------------------------------------------------------------
 
+@app.route("/api/status")
+def api_status():
+    """Return credential/config status so the UI can surface actionable errors."""
+    return jsonify({
+        "has_username": bool(_USERNAME),
+        "has_api_key": bool(_API_KEY),
+    })
+
+
 @app.route("/api/providers")
 def api_providers():
     """Return all providers that have filed availability data with the FCC."""
+    if not _USERNAME or not _API_KEY:
+        return jsonify({"error": "FCC credentials are not configured. Set FCC_USERNAME and FCC_API_KEY environment variables (in Railway: Variables tab)."}), 503
     try:
         data = _fcc_get("/map/listAvailabilityProviders")
         # Normalise: the API may wrap the list in a 'data' key
@@ -65,7 +84,11 @@ def api_providers():
             providers.sort(key=lambda p: (p.get("brand_name") or p.get("name") or "").lower())
         return jsonify({"providers": providers})
     except requests.HTTPError as exc:
-        return jsonify({"error": f"FCC API returned {exc.response.status_code}"}), 502
+        status = exc.response.status_code
+        detail = exc.response.text[:200]
+        if status == 403:
+            return jsonify({"error": f"FCC API access denied (403). Your credentials may be incorrect, or this server's IP may need to be registered with the FCC. Detail: {detail}"}), 502
+        return jsonify({"error": f"FCC API returned {status}: {detail}"}), 502
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
@@ -136,6 +159,8 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))
     debug = os.environ.get("FLASK_DEBUG", "1") == "1"
     print(f"\n  FCC Broadband Search running at http://localhost:{port}\n")
-    if not _USERNAME:
-        print("  WARNING: FCC_USERNAME not set — unauthenticated requests may be rate-limited.\n")
+    if not _USERNAME or not _API_KEY:
+        missing = [v for v, val in [("FCC_USERNAME", _USERNAME), ("FCC_API_KEY", _API_KEY)] if not val]
+        print(f"  WARNING: {', '.join(missing)} not set — FCC API calls will fail.\n")
+        print("  Set them as environment variables (or in Railway's Variables tab).\n")
     app.run(debug=debug, port=port)
